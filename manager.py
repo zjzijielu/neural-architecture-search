@@ -9,7 +9,8 @@ class NetworkManager:
     '''
     Helper class to manage the generation of subnetwork training given a dataset
     '''
-    def __init__(self, dataset, epochs=5, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0):
+    def __init__(self, dataset, epochs=5, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0, 
+                gamma=0.5, rnp=True):
         '''
         Manager which is tasked with creating subnetworks, training them on a dataset, and retrieving
         rewards in the term of accuracy, which is passed to the controller RNN.
@@ -30,6 +31,9 @@ class NetworkManager:
         self.beta = acc_beta
         self.beta_bias = acc_beta
         self.moving_acc = 0.0
+        self.moving_num_param = 0
+        self.gamma = gamma
+        self.rnp = rnp
 
     def get_rewards(self, model_fn, actions):
         '''
@@ -81,8 +85,30 @@ class NetworkManager:
             # evaluate the model
             loss, acc = model.evaluate(X_val, y_val, batch_size=self.batchsize)
 
-            # compute the reward
-            reward = (acc - self.moving_acc)
+            if self.rnp:
+                # get the number of parameters of the model
+                num_params = model.count_params()
+                # print(num_params, type(num_params))
+                # compute reward for number of parameters
+                reward_num_params = np.tanh(self.moving_num_param - num_params)
+
+                # compute reward for accuracy
+                reward_acc = acc - self.moving_acc
+
+                # combine two reward
+                reward = reward_acc + self.gamma * reward_num_params
+
+                print("params num = ", num_params)
+                print("EWA parmam num = ", self.moving_num_param)
+
+                print("reward for params num = ", reward_num_params)
+                print("reward for accuracy = ", reward_acc)
+
+            else:
+                reward = acc - self.moving_acc
+                
+                print("reward for accuracy = ", reward_acc)
+
 
             # if rewards are clipped, clip them in the range -0.05 to 0.05
             if self.clip_rewards:
@@ -92,14 +118,25 @@ class NetworkManager:
             if self.beta > 0.0 and self.beta < 1.0:
                 self.moving_acc = self.beta * self.moving_acc + (1 - self.beta) * acc
                 self.moving_acc = self.moving_acc / (1 - self.beta_bias)
+                
+                if self.rnp:
+                    self.moving_num_param = self.beta * self.moving_num_param + (1- self.beta) * num_params
+                    self.moving_num_param = self.moving_num_param / (1- self.beta_bias)
                 self.beta_bias = 0
 
-                reward = np.clip(reward, -0.1, 0.1)
+
+                reward = np.clip(reward, -0.3, 0.3)
 
             print()
+            if self.rnp:
+                print("Manager: EWA Num of Params = ", self.moving_num_param)
             print("Manager: EWA Accuracy = ", self.moving_acc)
 
         # clean up resources and GPU memory
         network_sess.close()
 
-        return reward, acc
+        return_list = [reward, acc]
+        if self.rnp:
+            return_list.append(num_params) 
+
+        return return_list
