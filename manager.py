@@ -10,7 +10,7 @@ class NetworkManager:
     Helper class to manage the generation of subnetwork training given a dataset
     '''
     def __init__(self, dataset, epochs=5, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0, 
-                gamma=0.5, rnp=True):
+                gamma=0.5, rnp=1):
         '''
         Manager which is tasked with creating subnetworks, training them on a dataset, and retrieving
         rewards in the term of accuracy, which is passed to the controller RNN.
@@ -24,7 +24,7 @@ class NetworkManager:
                 large weight updates. Use when training is highly unstable.
         '''
         self.dataset = dataset
-        self.epochs = epochs
+        self.epochs = epochs 
         self.batchsize = child_batchsize
         self.clip_rewards = clip_rewards
 
@@ -85,10 +85,10 @@ class NetworkManager:
             # evaluate the model
             loss, acc = model.evaluate(X_val, y_val, batch_size=self.batchsize)
 
-            if self.rnp:
-                # get the number of parameters of the model
-                num_params = model.count_params()
-                # print(num_params, type(num_params))
+            # get the number of parameters of the model
+            num_params = model.count_params()
+
+            if self.rnp:                
                 # compute reward for number of parameters
                 reward_num_params = np.tanh(self.moving_num_param - num_params)
 
@@ -107,8 +107,8 @@ class NetworkManager:
             else:
                 reward = acc - self.moving_acc
                 
-                print("reward for accuracy = ", reward_acc)
-
+                print("params num = ", num_params)
+                print("reward for accuracy = ", reward)
 
             # if rewards are clipped, clip them in the range -0.05 to 0.05
             if self.clip_rewards:
@@ -135,8 +135,4 @@ class NetworkManager:
         # clean up resources and GPU memory
         network_sess.close()
 
-        return_list = [reward, acc]
-        if self.rnp:
-            return_list.append(num_params) 
-
-        return return_list
+        return reward, acc, num_params

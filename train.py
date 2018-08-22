@@ -25,7 +25,7 @@ parser.add_argument('--acc_beta', type=float, default=0.8, help="beta for expone
 parser.add_argument('--clip', type=float, default=0.0, help="if clip the rewards to [-0.05, 0.05]")
 parser.add_argument('--r', type=bool, default=True, help="restore controller to continue training")
 parser.add_argument('--g', type=float, default=0.5, help="weight for num params reward")
-parser.add_argument('--rnp', type=bool, default=True, help="include num params as reward")
+parser.add_argument('--rnp', type=int, default=1, help="include num params as reward")
 
 args = parser.parse_args()
 
