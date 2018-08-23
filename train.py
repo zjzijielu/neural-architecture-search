@@ -26,6 +26,8 @@ parser.add_argument('--clip', type=float, default=0.0, help="if clip the rewards
 parser.add_argument('--r', type=bool, default=True, help="restore controller to continue training")
 parser.add_argument('--g', type=float, default=0.5, help="weight for num params reward")
 parser.add_argument('--rnp', type=int, default=1, help="include num params as reward")
+parser.add_argument('--es', type=int, default=1, help="train until overfitting")
+parser.add_argument('--th', type=float, default=0.5, help="threshold of accuracy")
 
 args = parser.parse_args()
 
@@ -48,6 +50,8 @@ CLIP_REWARDS = args.clip  # clip rewards in the [-0.05, 0.05] range
 RESTORE_CONTROLLER = args.r  # restore controller to continue training
 GAMMA = args.g 
 REWARD_NUM_PARAMS = args.rnp
+EARLY_STOPPING = args.es
+THRESHOLD = args.th
 
 # construct a state space
 state_space = StateSpace()
@@ -82,7 +86,7 @@ with policy_sess.as_default():
 
 # create the Network Manager
 manager = NetworkManager(dataset, epochs=MAX_EPOCHS, child_batchsize=CHILD_BATCHSIZE, clip_rewards=CLIP_REWARDS,
-                         acc_beta=ACCURACY_BETA, gamma=GAMMA, rnp=REWARD_NUM_PARAMS)
+                         acc_beta=ACCURACY_BETA, gamma=GAMMA, rnp=REWARD_NUM_PARAMS, es=EARLY_STOPPING)
 
 # get an initial random state space if controller needs to predict an
 # action from the initial state
@@ -97,7 +101,7 @@ controller.remove_files()
 for trial in range(MAX_TRIALS):
     with policy_sess.as_default():
         K.set_session(policy_sess)
-        actions = controller.get_action(state)  # get an action for the previous state
+        actions = controller.get_action(state, trial, MAX_TRIALS)  # get an action for the previous state
 
     # print the action probabilities
     state_space.print_actions(actions)

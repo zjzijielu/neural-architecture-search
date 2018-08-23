@@ -213,7 +213,7 @@ class Controller:
 
         self.build_policy_network()
 
-    def get_action(self, state):
+    def get_action(self, state, trial_num, max_trial):
         '''
         Gets a one hot encoded action list, either from random sampling or from
         the Controller RNN
@@ -225,7 +225,7 @@ class Controller:
         Returns:
             A one hot encoded action list
         '''
-        if np.random.random() < self.exploration:
+        if np.random.random() < self.exploration and trial_num < 0.8 * max_trial:
             print("Generating random action to explore")
             actions = []
 

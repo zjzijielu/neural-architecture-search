@@ -2,7 +2,7 @@ import numpy as np
 
 from keras.models import Model
 from keras import backend as K
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 import tensorflow as tf
 
 class NetworkManager:
@@ -10,7 +10,7 @@ class NetworkManager:
     Helper class to manage the generation of subnetwork training given a dataset
     '''
     def __init__(self, dataset, epochs=5, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0, 
-                gamma=0.5, rnp=1):
+                gamma=0.5, rnp=1, es=0, acc_thr=0):
         '''
         Manager which is tasked with creating subnetworks, training them on a dataset, and retrieving
         rewards in the term of accuracy, which is passed to the controller RNN.
@@ -34,6 +34,8 @@ class NetworkManager:
         self.moving_num_param = 0
         self.gamma = gamma
         self.rnp = rnp
+        self.es = es
+        self.acc_thr = acc_thr
 
     def get_rewards(self, model_fn, actions):
         '''
@@ -71,8 +73,21 @@ class NetworkManager:
             # unpack the dataset
             X_train, y_train, X_val, y_val = self.dataset
 
+	    # if early stopping flag is set
+            if self.es:	
+                earlystopper = EarlyStopping(monitor='val_acc', min_delta=0.01, patience=2, verbose=1)
+
+                model.fit(X_train, y_train, batch_size=self.batchsize, epochs=self.epochs,
+                      verbose=1, validation_data=(X_val, y_val),
+                      callbacks=[ModelCheckpoint('weights/temp_network.h5',
+                                                 monitor='val_acc', verbose=1,
+                                                 save_best_only=True,
+                                                 save_weights_only=True), earlystopper])
+		
+
             # train the model using Keras methods
-            model.fit(X_train, y_train, batch_size=self.batchsize, epochs=self.epochs,
+            else: 
+                model.fit(X_train, y_train, batch_size=self.batchsize, epochs=self.epochs,
                       verbose=1, validation_data=(X_val, y_val),
                       callbacks=[ModelCheckpoint('weights/temp_network.h5',
                                                  monitor='val_acc', verbose=1,
@@ -109,6 +124,10 @@ class NetworkManager:
                 
                 print("params num = ", num_params)
                 print("reward for accuracy = ", reward)
+
+            if self.acc_thr != 0:
+                reward = acc - self.acc_thr
+                return reward, acc, num_params
 
             # if rewards are clipped, clip them in the range -0.05 to 0.05
             if self.clip_rewards:
